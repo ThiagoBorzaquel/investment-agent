@@ -3,20 +3,23 @@ name: Daily Investment Agent
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * 1-5'
+    - cron: '0 12 * * *'
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       - name: Run agent
         run: python main.py

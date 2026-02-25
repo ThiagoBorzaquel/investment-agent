@@ -3,6 +3,7 @@ import datetime
 import requests
 from data.market_data import get_stock_data
 from analysis.scoring import value_score
+import matplotlib.pyplot as plt
 
 # Lista inicial
 tickers = [
@@ -46,7 +47,7 @@ for _, row in top20.head(5).iterrows():
 
 
 TOKEN = os.getenv("8714485092:AAEBTxwIFbwoE62tcBWtNSdXa-i5ePTAXvY")
-CHAT_ID = os.getenv('id": 8714485092')
+CHAT_ID = os.getenv("8714485092")
 
 print("TOKEN carregado:", bool(TOKEN))
 print("CHAT_ID carregado:", bool(CHAT_ID))
@@ -74,3 +75,48 @@ if TOKEN and CHAT_ID:
 
 else:
     print("Secrets não encontrados")
+
+    # =========================
+# GERAR GRÁFICO
+# =========================
+
+plt.figure()
+plt.bar(top20["Ticker"][:10], top20["Score"][:10])
+plt.xticks(rotation=45)
+plt.title("Top 10 Value Score")
+plt.tight_layout()
+plt.savefig("grafico.png")
+plt.close()
+
+print("Gráfico gerado")
+
+# =========================
+# GERAR HTML
+# =========================
+
+html = f"""
+<html>
+<head>
+    <title>Investment Agent</title>
+</head>
+<body>
+    <h1>Ranking Value - {hoje}</h1>
+
+    <h2>Top 5</h2>
+    <pre>
+{mensagem}
+    </pre>
+
+    <h2>Gráfico</h2>
+    <img src="grafico.png" width="600">
+
+    <h2>Downloads</h2>
+    <a href="{arquivo}">Baixar CSV</a>
+</body>
+</html>
+"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("HTML gerado")
