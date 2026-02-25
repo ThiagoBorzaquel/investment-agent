@@ -39,21 +39,21 @@ for i, row in top20.head(5).iterrows():
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-if bot8714485092:AAEBTxwIFbwoE62tcBWtNSdXa-i5ePTAXvY and id": 8714485092:
+
 
     # Enviar mensagem texto
-    url_msg = f"https://api.telegram.org/bot8714485092:AAEBTxwIFbwoE62tcBWtNSdXa-i5ePTAXvY/sendMessage"
+    
     r1 = requests.post(url_msg, data={
-        "chat_id": id": 8714485092,
+        
         "text": mensagem
     })
     print("Mensagem status:", r1.status_code, r1.text)
 
     # Enviar CSV
-    url_doc = f"https://api.telegram.org/bot8714485092:AAEBTxwIFbwoE62tcBWtNSdXa-i5ePTAXvY/sendDocument"
+   
     with open(arquivo, "rb") as file:
         r2 = requests.post(url_doc, data={
-            "chat_id": id": 8714485092
+           
         }, files={
             "document": file
         })
