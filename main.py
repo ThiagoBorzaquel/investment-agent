@@ -44,7 +44,7 @@ if TOKEN and CHAT_ID:
     # Enviar mensagem texto
     url_msg = f"https://api.telegram.org/bot8714485092:AAEBTxwIFbwoE62tcBWtNSdXa-i5ePTAXvY/sendMessage"
     requests.post(url_msg, data={
-        "chat_id": id": 146536864,
+        "chat_id": id": 8714485092,
         "text": mensagem
     })
 
@@ -52,7 +52,7 @@ if TOKEN and CHAT_ID:
     url_doc = f"https://api.telegram.org/bot8714485092:AAEBTxwIFbwoE62tcBWtNSdXa-i5ePTAXvY/sendDocument"
     with open(arquivo, "rb") as file:
         requests.post(url_doc, data={
-            "chat_id": id": 146536864
+            "chat_id": id": 8714485092
         }, files={
             "document": file
         })
