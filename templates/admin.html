@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin - Investment Agent</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    label { display: block; margin-top: 14px; font-weight: 600; }
+    input, textarea { width: 100%; padding: 10px; box-sizing: border-box; }
+    textarea { min-height: 96px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button { margin-top: 18px; padding: 10px 14px; cursor: pointer; }
+    .flash { padding: 10px; border-radius: 8px; margin: 10px 0; }
+    .success { background: #e6ffed; }
+    .error { background: #ffecec; }
+  </style>
+</head>
+<body>
+  <h1>Dashboard Admin</h1>
+  <p>Cadastre credenciais do ChatGPT/OpenAI e Instagram para o robô.</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="post">
+    <label>URLs do site (1 por linha)</label>
+    <textarea name="site_urls">{{ (settings.site_urls or [])|join('\n') }}</textarea>
+
+    <div class="row">
+      <div>
+        <label>Instagram User ID</label>
+        <input name="instagram_user_id" value="{{ settings.instagram_user_id or '' }}" />
+      </div>
+      <div>
+        <label>Instagram Access Token</label>
+        <input name="instagram_access_token" value="{{ settings.instagram_access_token or '' }}" />
+      </div>
+    </div>
+
+    <label>URL pública da imagem (INSTAGRAM_IMAGE_URL)</label>
+    <input name="instagram_image_url" value="{{ settings.instagram_image_url or '' }}" />
+
+    <div class="row">
+      <div>
+        <label>OpenAI API Key (ChatGPT)</label>
+        <input name="openai_api_key" value="{{ settings.openai_api_key or '' }}" />
+      </div>
+      <div>
+        <label>Horários (HH:MM, separados por vírgula)</label>
+        <input name="schedule_times" value="{{ (settings.schedule_times or ['09:00'])|join(',') }}" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Modelo de texto</label>
+        <input name="openai_text_model" value="{{ settings.openai_text_model or 'gpt-4.1-mini' }}" />
+      </div>
+      <div>
+        <label>Modelo de imagem</label>
+        <input name="openai_image_model" value="{{ settings.openai_image_model or 'gpt-image-1' }}" />
+      </div>
+    </div>
+
+    <label>Timezone</label>
+    <input name="timezone" value="{{ settings.timezone or 'America/Sao_Paulo' }}" />
+
+    <button type="submit">Salvar configurações</button>
+  </form>
+
+  <form method="post" action="/run-now">
+    <button type="submit">Executar post agora</button>
+  </form>
+</body>
+</html>

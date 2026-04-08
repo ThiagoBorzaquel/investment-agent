@@ -6,3 +6,4 @@ matplotlib
 apscheduler
 beautifulsoup4
 pillow
+flask

@@ -1,12 +1,13 @@
 import base64
 import datetime as dt
+import json
 import os
 import random
 import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 import requests
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -33,7 +34,6 @@ POST_PROMPT_TEMPLATE = textwrap.dedent(
     """
 ).strip()
 
-
 IMAGE_PROMPT_TEMPLATE = (
     "Agora crie uma imagem usando o logo e o ticker com formato para postar no Instagram. "
     "Use estilo moderno e legível para feed (1080x1080). "
@@ -46,6 +46,7 @@ class BotConfig:
     site_urls: List[str]
     instagram_user_id: str
     instagram_access_token: str
+    instagram_image_url: str
     schedule_times: List[str]
     timezone: str = "America/Sao_Paulo"
     output_dir: Path = Path("generated")
@@ -71,14 +72,10 @@ class ContentAutomationBot:
         image_prompt = self._build_image_prompt(unique_tickers)
         image_path = self._generate_image(image_prompt=image_prompt, fallback_caption=caption)
 
-        image_url = os.getenv("INSTAGRAM_IMAGE_URL")
-        if not image_url:
-            raise RuntimeError(
-                "Defina INSTAGRAM_IMAGE_URL com uma URL pública da imagem gerada "
-                "(ex.: CDN/S3/Cloudinary) para publicar no Instagram."
-            )
+        if not self.config.instagram_image_url:
+            raise RuntimeError("Defina INSTAGRAM_IMAGE_URL no painel/admin ou variáveis de ambiente.")
 
-        creation_id = self._create_instagram_media(caption=caption, image_url=image_url)
+        creation_id = self._create_instagram_media(caption=caption, image_url=self.config.instagram_image_url)
         self._publish_instagram_media(creation_id)
 
         print(f"URL escolhida aleatoriamente: {selected_url}")
@@ -96,10 +93,8 @@ class ContentAutomationBot:
 
         soup = BeautifulSoup(response.text, "html.parser")
         title = (soup.title.string or "Sem título").strip() if soup.title else "Sem título"
-
         paragraphs = [p.get_text(" ", strip=True) for p in soup.select("p")]
-        body_text = " ".join([p for p in paragraphs if p])
-        body_text = textwrap.shorten(body_text, width=1400, placeholder="...")
+        body_text = textwrap.shorten(" ".join([p for p in paragraphs if p]), width=1400, placeholder="...")
 
         content = f"Título: {title}\nResumo: {body_text}"
         return selected_url, content
@@ -118,8 +113,7 @@ class ContentAutomationBot:
 
     def _generate_caption(self, post_prompt: str, tickers: List[str]) -> str:
         if self.config.openai_api_key:
-            caption = self._generate_caption_with_openai(post_prompt)
-            return caption[:2200]
+            return self._generate_caption_with_openai(post_prompt)[:2200]
 
         ticker_text = ", ".join(tickers) if tickers else "ticker não identificado"
         return (
@@ -137,19 +131,14 @@ class ContentAutomationBot:
                 "Authorization": f"Bearer {self.config.openai_api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": self.config.openai_text_model,
-                "input": post_prompt,
-            },
+            json={"model": self.config.openai_text_model, "input": post_prompt},
             timeout=60,
         )
         response.raise_for_status()
         payload = response.json()
-
         output_text = payload.get("output_text", "").strip()
         if output_text:
             return output_text
-
         raise RuntimeError(f"Resposta inválida ao gerar legenda: {payload}")
 
     def _build_image_prompt(self, tickers: List[str]) -> str:
@@ -162,7 +151,6 @@ class ContentAutomationBot:
 
         image = Image.new("RGB", (1080, 1080), color=(20, 24, 36))
         draw = ImageDraw.Draw(image)
-
         try:
             title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 64)
             body_font = ImageFont.truetype("DejaVuSans.ttf", 38)
@@ -171,13 +159,7 @@ class ContentAutomationBot:
             body_font = ImageFont.load_default()
 
         draw.text((80, 120), "Post automático", fill=(255, 255, 255), font=title_font)
-        draw.text(
-            (80, 260),
-            textwrap.fill(fallback_caption[:320], width=34),
-            fill=(200, 216, 255),
-            font=body_font,
-            spacing=10,
-        )
+        draw.text((80, 260), textwrap.fill(fallback_caption[:320], width=34), fill=(200, 216, 255), font=body_font)
 
         output = self.config.output_dir / f"post_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         image.save(output)
@@ -205,9 +187,8 @@ class ContentAutomationBot:
         if not b64_data:
             raise RuntimeError(f"Resposta inválida ao gerar imagem: {payload}")
 
-        image_bytes = base64.b64decode(b64_data)
         output = self.config.output_dir / f"post_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        output.write_bytes(image_bytes)
+        output.write_bytes(base64.b64decode(b64_data))
         return output
 
     def _create_instagram_media(self, caption: str, image_url: str) -> str:
@@ -222,7 +203,6 @@ class ContentAutomationBot:
             timeout=30,
         )
         response.raise_for_status()
-
         payload = response.json()
         creation_id = payload.get("id")
         if not creation_id:
@@ -233,24 +213,56 @@ class ContentAutomationBot:
         endpoint = f"https://graph.facebook.com/v22.0/{self.config.instagram_user_id}/media_publish"
         response = requests.post(
             endpoint,
-            data={
-                "creation_id": creation_id,
-                "access_token": self.config.instagram_access_token,
-            },
+            data={"creation_id": creation_id, "access_token": self.config.instagram_access_token},
             timeout=30,
         )
         response.raise_for_status()
 
 
-def _load_config_from_env() -> BotConfig:
-    site_urls = [u.strip() for u in os.getenv("SITE_URLS", "").split(",") if u.strip()]
-    schedule_times = [t.strip() for t in os.getenv("SCHEDULE_TIMES", "09:00").split(",") if t.strip()]
+def load_runtime_settings(config_file: str | None = None) -> Dict[str, Any]:
+    file_path = Path(config_file or os.getenv("BOT_CONFIG_FILE", ".bot_config.json"))
+    data: Dict[str, Any] = {}
 
+    if file_path.exists():
+        data = json.loads(file_path.read_text(encoding="utf-8"))
+
+    env_override = {
+        "site_urls": [u.strip() for u in os.getenv("SITE_URLS", "").split(",") if u.strip()],
+        "instagram_user_id": os.getenv("IG_USER_ID", ""),
+        "instagram_access_token": os.getenv("IG_ACCESS_TOKEN", ""),
+        "instagram_image_url": os.getenv("INSTAGRAM_IMAGE_URL", ""),
+        "schedule_times": [t.strip() for t in os.getenv("SCHEDULE_TIMES", "").split(",") if t.strip()],
+        "timezone": os.getenv("BOT_TIMEZONE", ""),
+        "openai_api_key": os.getenv("OPENAI_API_KEY", ""),
+        "openai_text_model": os.getenv("OPENAI_TEXT_MODEL", ""),
+        "openai_image_model": os.getenv("OPENAI_IMAGE_MODEL", ""),
+    }
+
+    for key, value in env_override.items():
+        if value:
+            data[key] = value
+
+    data.setdefault("schedule_times", ["09:00"])
+    data.setdefault("timezone", "America/Sao_Paulo")
+    data.setdefault("openai_text_model", "gpt-4.1-mini")
+    data.setdefault("openai_image_model", "gpt-image-1")
+
+    return data
+
+
+def save_runtime_settings(settings: Dict[str, Any], config_file: str | None = None) -> Path:
+    file_path = Path(config_file or os.getenv("BOT_CONFIG_FILE", ".bot_config.json"))
+    file_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
+    return file_path
+
+
+def build_bot_config(settings: Dict[str, Any]) -> BotConfig:
+    site_urls = settings.get("site_urls", [])
     if not site_urls:
-        raise RuntimeError("Defina SITE_URLS com URLs separadas por vírgula.")
+        raise RuntimeError("Defina SITE_URLS.")
 
-    user_id = os.getenv("IG_USER_ID", "")
-    token = os.getenv("IG_ACCESS_TOKEN", "")
+    user_id = settings.get("instagram_user_id", "")
+    token = settings.get("instagram_access_token", "")
     if not user_id or not token:
         raise RuntimeError("Defina IG_USER_ID e IG_ACCESS_TOKEN.")
 
@@ -258,16 +270,18 @@ def _load_config_from_env() -> BotConfig:
         site_urls=site_urls,
         instagram_user_id=user_id,
         instagram_access_token=token,
-        schedule_times=schedule_times,
-        timezone=os.getenv("BOT_TIMEZONE", "America/Sao_Paulo"),
-        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-        openai_text_model=os.getenv("OPENAI_TEXT_MODEL", "gpt-4.1-mini"),
-        openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1"),
+        instagram_image_url=settings.get("instagram_image_url", ""),
+        schedule_times=settings.get("schedule_times", ["09:00"]),
+        timezone=settings.get("timezone", "America/Sao_Paulo"),
+        openai_api_key=settings.get("openai_api_key", ""),
+        openai_text_model=settings.get("openai_text_model", "gpt-4.1-mini"),
+        openai_image_model=settings.get("openai_image_model", "gpt-image-1"),
     )
 
 
 def main() -> None:
-    config = _load_config_from_env()
+    settings = load_runtime_settings()
+    config = build_bot_config(settings)
     bot = ContentAutomationBot(config)
 
     run_immediately = os.getenv("RUN_IMMEDIATELY", "true").lower() == "true"
@@ -277,14 +291,7 @@ def main() -> None:
     scheduler = BlockingScheduler(timezone=config.timezone)
     for schedule in config.schedule_times:
         hour, minute = schedule.split(":", 1)
-        scheduler.add_job(
-            bot.run_once,
-            trigger="cron",
-            hour=int(hour),
-            minute=int(minute),
-            id=f"post_{hour}_{minute}",
-            replace_existing=True,
-        )
+        scheduler.add_job(bot.run_once, trigger="cron", hour=int(hour), minute=int(minute), id=f"post_{hour}_{minute}", replace_existing=True)
 
     print(f"Agendamentos ativos: {', '.join(config.schedule_times)} ({config.timezone})")
     scheduler.start()
