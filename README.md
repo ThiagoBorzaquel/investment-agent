@@ -1,8 +1,24 @@
 # Robô de conteúdo para Instagram
 
+## Segurança do Admin
+
+O painel agora exige autenticação com:
+
+- cadastro com **email + senha**
+- login
+- recuperação de senha (token)
+- **2FA (TOTP)** na etapa de login
+
+### Fluxo
+
+1. Acesse `/register` para criar usuário admin.
+2. Guarde a chave 2FA exibida no cadastro e cadastre no app autenticador.
+3. Faça login em `/login` e valide o código em `/verify-2fa`.
+4. Se esquecer a senha, use `/forgot-password` e depois `/reset-password`.
+
 ## Dashboard Admin
 
-No dashboard (`admin_dashboard.py`) você configura:
+Após login, no dashboard (`/`) você configura:
 
 1. Lista de URLs (adicionar/editar/apagar)
 2. Prompt de geração do post (adicionar/editar/apagar)
@@ -10,17 +26,10 @@ No dashboard (`admin_dashboard.py`) você configura:
 
 ## Agendamento e aprovação
 
-O dashboard tem uma caixa de configuração para:
+- Modo de postagem: automático ou com aprovação.
+- Tipo de agendamento: horários fixos (`schedule_times`) ou intervalo (`interval_minutes`).
 
-- **Modo de postagem**
-  - `Postar automaticamente`
-  - `Postar com aprovação no dashboard`
-- **Tipo de agendamento**
-  - `Horários pré-programados` (campo `schedule_times`)
-  - `Intervalo de tempo` (campo `interval_minutes`)
-
-Quando `posting_mode=approval`, o robô gera conteúdo e salva pendente em `generated/pending_post.json`.
-Depois você usa o botão **Aprovar e publicar post pendente** no dashboard.
+Com aprovação, o post pendente fica em `generated/pending_post.json` e deve ser aprovado no botão do dashboard.
 
 ## Executar
 
@@ -29,9 +38,3 @@ python admin_dashboard.py
 ```
 
 Acesse `http://localhost:8080`.
-
-Para rodar apenas o scheduler:
-
-```bash
-python social_automation.py
-```

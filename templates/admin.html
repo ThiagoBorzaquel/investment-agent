@@ -19,6 +19,7 @@
 </head>
 <body>
   <h1>Dashboard Admin</h1>
+  <p>Logado como: {{ email }} | <a href="/logout">Sair</a></p>
   <p>Configure prompts, URLs e agendamento com publicação automática ou por aprovação.</p>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
