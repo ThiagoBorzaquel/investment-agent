@@ -19,6 +19,9 @@ def _form_to_settings(form):
         "instagram_access_token": form.get("instagram_access_token", "").strip(),
         "instagram_image_url": form.get("instagram_image_url", "").strip(),
         "schedule_times": _clean_list(form.get("schedule_times", "09:00").split(",")),
+        "schedule_mode": form.get("schedule_mode", "fixed").strip(),
+        "interval_minutes": int(form.get("interval_minutes", "60") or "60"),
+        "posting_mode": form.get("posting_mode", "auto").strip(),
         "timezone": form.get("timezone", "America/Sao_Paulo").strip(),
         "openai_api_key": form.get("openai_api_key", "").strip(),
         "openai_text_model": form.get("openai_text_model", "gpt-4.1-mini").strip(),
@@ -41,12 +44,22 @@ def index():
 @app.post("/run-now")
 def run_now():
     try:
-        settings = load_runtime_settings()
-        bot = ContentAutomationBot(build_bot_config(settings))
+        bot = ContentAutomationBot(build_bot_config(load_runtime_settings()))
         bot.run_once()
-        flash("Post executado com sucesso.", "success")
+        flash("Processo executado com sucesso.", "success")
     except Exception as exc:
-        flash(f"Erro ao executar post: {exc}", "error")
+        flash(f"Erro ao executar: {exc}", "error")
+    return redirect(url_for("index"))
+
+
+@app.post("/approve-post")
+def approve_post():
+    try:
+        bot = ContentAutomationBot(build_bot_config(load_runtime_settings()))
+        bot.approve_pending_post()
+        flash("Post pendente aprovado e publicado.", "success")
+    except Exception as exc:
+        flash(f"Erro ao aprovar post: {exc}", "error")
     return redirect(url_for("index"))
 
 

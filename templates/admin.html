@@ -9,7 +9,7 @@
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .group { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
     .item { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 8px; }
-    input, textarea { width: 100%; padding: 10px; box-sizing: border-box; }
+    input, textarea, select { width: 100%; padding: 10px; box-sizing: border-box; }
     button { padding: 8px 12px; cursor: pointer; }
     .btn-danger { background: #ffe7e7; border: 1px solid #efb0b0; }
     .flash { padding: 10px; border-radius: 8px; margin: 10px 0; }
@@ -19,7 +19,7 @@
 </head>
 <body>
   <h1>Dashboard Admin</h1>
-  <p>Campos com adicionar/editar/apagar para prompts e URLs.</p>
+  <p>Configure prompts, URLs e agendamento com publicação automática ou por aprovação.</p>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
@@ -46,6 +46,36 @@
       <button type="button" onclick="addItem('image_prompts_container','image_prompts','Novo prompt de imagem')">+ Adicionar prompt imagem</button>
     </div>
 
+    <div class="group">
+      <h3>Configuração de Publicação</h3>
+      <div class="row">
+        <div>
+          <label>Modo de postagem</label>
+          <select name="posting_mode">
+            <option value="auto" {% if (settings.posting_mode or 'auto') == 'auto' %}selected{% endif %}>Postar automaticamente</option>
+            <option value="approval" {% if settings.posting_mode == 'approval' %}selected{% endif %}>Postar com aprovação no dashboard</option>
+          </select>
+        </div>
+        <div>
+          <label>Tipo de agendamento</label>
+          <select name="schedule_mode">
+            <option value="fixed" {% if (settings.schedule_mode or 'fixed') == 'fixed' %}selected{% endif %}>Horários pré-programados</option>
+            <option value="interval" {% if settings.schedule_mode == 'interval' %}selected{% endif %}>Intervalo de tempo</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Horários (HH:MM separados por vírgula)</label>
+          <input name="schedule_times" value="{{ (settings.schedule_times or ['09:00'])|join(',') }}" />
+        </div>
+        <div>
+          <label>Intervalo em minutos</label>
+          <input name="interval_minutes" type="number" min="1" value="{{ settings.interval_minutes or 60 }}" />
+        </div>
+      </div>
+    </div>
+
     <div class="row">
       <div>
         <label>Instagram User ID</label>
@@ -66,8 +96,8 @@
         <input name="openai_api_key" value="{{ settings.openai_api_key or '' }}" />
       </div>
       <div>
-        <label>Horários (HH:MM, separados por vírgula)</label>
-        <input name="schedule_times" value="{{ (settings.schedule_times or ['09:00'])|join(',') }}" />
+        <label>Timezone</label>
+        <input name="timezone" value="{{ settings.timezone or 'America/Sao_Paulo' }}" />
       </div>
     </div>
 
@@ -82,33 +112,26 @@
       </div>
     </div>
 
-    <label>Timezone</label>
-    <input name="timezone" value="{{ settings.timezone or 'America/Sao_Paulo' }}" />
-
     <button type="submit">Salvar configurações</button>
   </form>
 
-  <form method="post" action="/run-now">
-    <button type="submit">Executar post agora</button>
-  </form>
+  <form method="post" action="/run-now"><button type="submit">Executar processo agora</button></form>
+  <form method="post" action="/approve-post"><button type="submit">Aprovar e publicar post pendente</button></form>
 
   <script>
     function addItem(containerId, inputName, value = '') {
       const container = document.getElementById(containerId);
       const wrapper = document.createElement('div');
       wrapper.className = 'item';
-
       const input = document.createElement('textarea');
       input.name = inputName;
       input.value = value;
       input.rows = 3;
-
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'btn-danger';
       removeBtn.textContent = 'Apagar';
       removeBtn.onclick = () => wrapper.remove();
-
       wrapper.appendChild(input);
       wrapper.appendChild(removeBtn);
       container.appendChild(wrapper);
@@ -117,7 +140,6 @@
     const initialSiteUrls = {{ (settings.site_urls or []) | tojson }};
     const initialPostPrompts = {{ (settings.post_prompts or []) | tojson }};
     const initialImagePrompts = {{ (settings.image_prompts or []) | tojson }};
-
     (initialSiteUrls.length ? initialSiteUrls : ['']).forEach(v => addItem('site_urls_container', 'site_urls', v));
     (initialPostPrompts.length ? initialPostPrompts : ['']).forEach(v => addItem('post_prompts_container', 'post_prompts', v));
     (initialImagePrompts.length ? initialImagePrompts : ['']).forEach(v => addItem('image_prompts_container', 'image_prompts', v));

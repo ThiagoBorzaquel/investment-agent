@@ -2,15 +2,27 @@
 
 ## Dashboard Admin
 
-No dashboard (`admin_dashboard.py`) existem **3 campos principais** com suporte a **editar, adicionar e apagar** itens:
+No dashboard (`admin_dashboard.py`) você configura:
 
-1. Lista de URLs
-2. Prompt de geração do post
-3. Prompt de geração da imagem
+1. Lista de URLs (adicionar/editar/apagar)
+2. Prompt de geração do post (adicionar/editar/apagar)
+3. Prompt de geração da imagem (adicionar/editar/apagar)
 
-Cada um aceita múltiplas entradas. O robô escolhe aleatoriamente uma URL e também pode sortear prompts da lista.
+## Agendamento e aprovação
 
-### Executar dashboard
+O dashboard tem uma caixa de configuração para:
+
+- **Modo de postagem**
+  - `Postar automaticamente`
+  - `Postar com aprovação no dashboard`
+- **Tipo de agendamento**
+  - `Horários pré-programados` (campo `schedule_times`)
+  - `Intervalo de tempo` (campo `interval_minutes`)
+
+Quando `posting_mode=approval`, o robô gera conteúdo e salva pendente em `generated/pending_post.json`.
+Depois você usa o botão **Aprovar e publicar post pendente** no dashboard.
+
+## Executar
 
 ```bash
 python admin_dashboard.py
@@ -18,21 +30,8 @@ python admin_dashboard.py
 
 Acesse `http://localhost:8080`.
 
-## Robô
+Para rodar apenas o scheduler:
 
 ```bash
 python social_automation.py
 ```
-
-As configurações são salvas em `.bot_config.json`.
-
-## Campos adicionais no dashboard
-
-- `instagram_user_id`
-- `instagram_access_token`
-- `instagram_image_url`
-- `openai_api_key`
-- `openai_text_model`
-- `openai_image_model`
-- `schedule_times`
-- `timezone`

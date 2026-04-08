@@ -32,12 +32,7 @@ DEFAULT_POST_PROMPT = textwrap.dedent(
     {content}
     """
 ).strip()
-
-DEFAULT_IMAGE_PROMPT = (
-    "Agora crie uma imagem usando o logo e o ticker com formato para postar no Instagram. "
-    "Use estilo moderno e legível para feed (1080x1080). "
-    "Ticker principal: {ticker}."
-)
+DEFAULT_IMAGE_PROMPT = "Agora crie uma imagem usando o logo e o ticker com formato para postar no Instagram. Ticker principal: {ticker}."
 
 
 @dataclass
@@ -49,6 +44,9 @@ class BotConfig:
     schedule_times: List[str]
     post_prompts: List[str]
     image_prompts: List[str]
+    posting_mode: str  # auto | approval
+    schedule_mode: str  # fixed | interval
+    interval_minutes: int
     timezone: str = "America/Sao_Paulo"
     output_dir: Path = Path("generated")
     openai_api_key: str = ""
@@ -60,6 +58,7 @@ class ContentAutomationBot:
     def __init__(self, config: BotConfig):
         self.config = config
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
+        self.pending_file = self.config.output_dir / "pending_post.json"
 
     def run_once(self) -> None:
         selected_url, raw_content = self._collect_random_page_content(self.config.site_urls)
@@ -67,13 +66,38 @@ class ContentAutomationBot:
 
         post_prompt = self._build_post_prompt(selected_url, raw_content, tickers)
         caption = self._generate_caption(post_prompt, tickers)
-
         image_prompt = self._build_image_prompt(tickers)
-        self._generate_image(image_prompt, caption)
+        image_path = self._generate_image(image_prompt, caption)
 
+        if self.config.posting_mode == "approval":
+            self._save_pending_post(caption=caption, image_path=str(image_path), selected_url=selected_url)
+            return
+
+        self._publish_caption(caption)
+
+    def approve_pending_post(self) -> None:
+        if not self.pending_file.exists():
+            raise RuntimeError("Não há post pendente para aprovação.")
+        pending = json.loads(self.pending_file.read_text(encoding="utf-8"))
+        caption = pending.get("caption", "")
+        if not caption:
+            raise RuntimeError("Post pendente inválido: sem legenda.")
+        self._publish_caption(caption)
+        self.pending_file.unlink(missing_ok=True)
+
+    def _save_pending_post(self, caption: str, image_path: str, selected_url: str) -> None:
+        payload = {
+            "created_at": dt.datetime.now().isoformat(),
+            "caption": caption,
+            "image_path": image_path,
+            "source_url": selected_url,
+            "status": "pending_approval",
+        }
+        self.pending_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _publish_caption(self, caption: str) -> None:
         if not self.config.instagram_image_url:
             raise RuntimeError("Defina INSTAGRAM_IMAGE_URL no dashboard ou ambiente.")
-
         creation_id = self._create_instagram_media(caption, self.config.instagram_image_url)
         self._publish_instagram_media(creation_id)
 
@@ -81,7 +105,6 @@ class ContentAutomationBot:
         selected_url = random.choice(urls)
         response = requests.get(selected_url, timeout=20)
         response.raise_for_status()
-
         soup = BeautifulSoup(response.text, "html.parser")
         title = (soup.title.string or "Sem título").strip() if soup.title else "Sem título"
         body_text = " ".join([p.get_text(" ", strip=True) for p in soup.select("p") if p.get_text(strip=True)])
@@ -115,13 +138,7 @@ class ContentAutomationBot:
     def _generate_caption(self, post_prompt: str, tickers: List[str]) -> str:
         if self.config.openai_api_key:
             return self._generate_caption_with_openai(post_prompt)[:2200]
-        ticker_text = ", ".join(tickers) if tickers else "ticker não identificado"
-        return (
-            "📈 Radar de hoje\n\n"
-            f"Destaques: {ticker_text}.\n"
-            "Esse conteúdo é informativo e NÃO é recomendação de investimento.\n"
-            "Acesse o site e veja o ranking completo."
-        )[:2200]
+        return f"📈 Radar de hoje\n\nDestaques: {', '.join(tickers) if tickers else 'ticker não identificado'}.\nNão é recomendação de investimento."[:2200]
 
     def _generate_caption_with_openai(self, post_prompt: str) -> str:
         response = requests.post(
@@ -131,16 +148,14 @@ class ContentAutomationBot:
             timeout=60,
         )
         response.raise_for_status()
-        payload = response.json()
-        output = payload.get("output_text", "").strip()
+        output = response.json().get("output_text", "").strip()
         if not output:
-            raise RuntimeError(f"Resposta inválida ao gerar legenda: {payload}")
+            raise RuntimeError("Resposta inválida ao gerar legenda.")
         return output
 
     def _generate_image(self, image_prompt: str, fallback_caption: str) -> Path:
         if self.config.openai_api_key:
             return self._generate_image_with_openai(image_prompt)
-
         image = Image.new("RGB", (1080, 1080), color=(20, 24, 36))
         draw = ImageDraw.Draw(image)
         try:
@@ -149,10 +164,8 @@ class ContentAutomationBot:
         except OSError:
             title_font = ImageFont.load_default()
             body_font = ImageFont.load_default()
-
         draw.text((80, 120), "Post automático", fill=(255, 255, 255), font=title_font)
         draw.text((80, 260), textwrap.fill(fallback_caption[:320], width=34), fill=(200, 216, 255), font=body_font)
-
         output = self.config.output_dir / f"post_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         image.save(output)
         return output
@@ -161,30 +174,20 @@ class ContentAutomationBot:
         response = requests.post(
             "https://api.openai.com/v1/images/generations",
             headers={"Authorization": f"Bearer {self.config.openai_api_key}", "Content-Type": "application/json"},
-            json={
-                "model": self.config.openai_image_model,
-                "prompt": image_prompt,
-                "size": "1024x1024",
-                "response_format": "b64_json",
-            },
+            json={"model": self.config.openai_image_model, "prompt": image_prompt, "size": "1024x1024", "response_format": "b64_json"},
             timeout=90,
         )
         response.raise_for_status()
         b64_data = response.json().get("data", [{}])[0].get("b64_json")
         if not b64_data:
             raise RuntimeError("Falha ao gerar imagem com OpenAI.")
-
         output = self.config.output_dir / f"post_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         output.write_bytes(base64.b64decode(b64_data))
         return output
 
     def _create_instagram_media(self, caption: str, image_url: str) -> str:
         endpoint = f"https://graph.facebook.com/v22.0/{self.config.instagram_user_id}/media"
-        response = requests.post(
-            endpoint,
-            data={"image_url": image_url, "caption": caption, "access_token": self.config.instagram_access_token},
-            timeout=30,
-        )
+        response = requests.post(endpoint, data={"image_url": image_url, "caption": caption, "access_token": self.config.instagram_access_token}, timeout=30)
         response.raise_for_status()
         media_id = response.json().get("id")
         if not media_id:
@@ -193,11 +196,7 @@ class ContentAutomationBot:
 
     def _publish_instagram_media(self, creation_id: str) -> None:
         endpoint = f"https://graph.facebook.com/v22.0/{self.config.instagram_user_id}/media_publish"
-        response = requests.post(
-            endpoint,
-            data={"creation_id": creation_id, "access_token": self.config.instagram_access_token},
-            timeout=30,
-        )
+        response = requests.post(endpoint, data={"creation_id": creation_id, "access_token": self.config.instagram_access_token}, timeout=30)
         response.raise_for_status()
 
 
@@ -216,12 +215,14 @@ def load_runtime_settings(config_file: str | None = None) -> Dict[str, Any]:
         "schedule_times": env_list("SCHEDULE_TIMES"),
         "post_prompts": env_list("POST_PROMPTS"),
         "image_prompts": env_list("IMAGE_PROMPTS"),
+        "posting_mode": os.getenv("POSTING_MODE", ""),
+        "schedule_mode": os.getenv("SCHEDULE_MODE", ""),
+        "interval_minutes": os.getenv("INTERVAL_MINUTES", ""),
         "timezone": os.getenv("BOT_TIMEZONE", ""),
         "openai_api_key": os.getenv("OPENAI_API_KEY", ""),
         "openai_text_model": os.getenv("OPENAI_TEXT_MODEL", ""),
         "openai_image_model": os.getenv("OPENAI_IMAGE_MODEL", ""),
     }
-
     for key, value in overrides.items():
         if value:
             data[key] = value
@@ -229,6 +230,9 @@ def load_runtime_settings(config_file: str | None = None) -> Dict[str, Any]:
     data.setdefault("schedule_times", ["09:00"])
     data.setdefault("post_prompts", [DEFAULT_POST_PROMPT])
     data.setdefault("image_prompts", [DEFAULT_IMAGE_PROMPT])
+    data.setdefault("posting_mode", "auto")
+    data.setdefault("schedule_mode", "fixed")
+    data.setdefault("interval_minutes", 60)
     data.setdefault("timezone", "America/Sao_Paulo")
     data.setdefault("openai_text_model", "gpt-4.1-mini")
     data.setdefault("openai_image_model", "gpt-image-1")
@@ -245,7 +249,6 @@ def build_bot_config(settings: Dict[str, Any]) -> BotConfig:
     site_urls = settings.get("site_urls", [])
     if not site_urls:
         raise RuntimeError("Adicione pelo menos uma URL da lista.")
-
     user_id = settings.get("instagram_user_id", "")
     token = settings.get("instagram_access_token", "")
     if not user_id or not token:
@@ -259,6 +262,9 @@ def build_bot_config(settings: Dict[str, Any]) -> BotConfig:
         schedule_times=settings.get("schedule_times", ["09:00"]),
         post_prompts=settings.get("post_prompts", [DEFAULT_POST_PROMPT]),
         image_prompts=settings.get("image_prompts", [DEFAULT_IMAGE_PROMPT]),
+        posting_mode=str(settings.get("posting_mode", "auto")),
+        schedule_mode=str(settings.get("schedule_mode", "fixed")),
+        interval_minutes=int(settings.get("interval_minutes", 60)),
         timezone=settings.get("timezone", "America/Sao_Paulo"),
         openai_api_key=settings.get("openai_api_key", ""),
         openai_text_model=settings.get("openai_text_model", "gpt-4.1-mini"),
@@ -267,16 +273,20 @@ def build_bot_config(settings: Dict[str, Any]) -> BotConfig:
 
 
 def main() -> None:
-    settings = load_runtime_settings()
-    bot = ContentAutomationBot(build_bot_config(settings))
+    config = build_bot_config(load_runtime_settings())
+    bot = ContentAutomationBot(config)
 
     if os.getenv("RUN_IMMEDIATELY", "true").lower() == "true":
         bot.run_once()
 
-    scheduler = BlockingScheduler(timezone=bot.config.timezone)
-    for schedule in bot.config.schedule_times:
-        hour, minute = schedule.split(":", 1)
-        scheduler.add_job(bot.run_once, trigger="cron", hour=int(hour), minute=int(minute), id=f"post_{hour}_{minute}", replace_existing=True)
+    scheduler = BlockingScheduler(timezone=config.timezone)
+    if config.schedule_mode == "interval":
+        scheduler.add_job(bot.run_once, trigger="interval", minutes=config.interval_minutes, id="post_interval", replace_existing=True)
+    else:
+        for schedule in config.schedule_times:
+            hour, minute = schedule.split(":", 1)
+            scheduler.add_job(bot.run_once, trigger="cron", hour=int(hour), minute=int(minute), id=f"post_{hour}_{minute}", replace_existing=True)
+
     scheduler.start()
 
 
