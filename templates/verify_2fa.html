@@ -1,0 +1,8 @@
+<!doctype html><html><body>
+<h2>Verificação 2FA</h2>
+{% with messages = get_flashed_messages(with_categories=true) %}{% for c,m in messages %}<p>{{m}}</p>{% endfor %}{% endwith %}
+<form method="post">
+  <input name="code" placeholder="Código do app autenticador" required />
+  <button type="submit">Validar</button>
+</form>
+</body></html>

@@ -1,0 +1,10 @@
+<!doctype html><html><body>
+<h2>Cadastro Admin</h2>
+{% with messages = get_flashed_messages(with_categories=true) %}{% for c,m in messages %}<p>{{m}}</p>{% endfor %}{% endwith %}
+<form method="post">
+  <input name="email" type="email" placeholder="Email" required />
+  <input name="password" type="password" placeholder="Senha" required />
+  <button type="submit">Cadastrar</button>
+</form>
+<p><a href="/login">Voltar ao login</a></p>
+</body></html>
