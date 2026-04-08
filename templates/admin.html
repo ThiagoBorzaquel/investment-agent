@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin - Investment Agent</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; }
-    label { display: block; margin-top: 14px; font-weight: 600; }
-    input, textarea { width: 100%; padding: 10px; box-sizing: border-box; }
-    textarea { min-height: 96px; }
+    body { font-family: Arial, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    button { margin-top: 18px; padding: 10px 14px; cursor: pointer; }
+    .group { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .item { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 8px; }
+    input, textarea { width: 100%; padding: 10px; box-sizing: border-box; }
+    button { padding: 8px 12px; cursor: pointer; }
+    .btn-danger { background: #ffe7e7; border: 1px solid #efb0b0; }
     .flash { padding: 10px; border-radius: 8px; margin: 10px 0; }
     .success { background: #e6ffed; }
     .error { background: #ffecec; }
@@ -18,7 +19,7 @@
 </head>
 <body>
   <h1>Dashboard Admin</h1>
-  <p>Cadastre credenciais do ChatGPT/OpenAI e Instagram para o robô.</p>
+  <p>Campos com adicionar/editar/apagar para prompts e URLs.</p>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
@@ -27,8 +28,23 @@
   {% endwith %}
 
   <form method="post">
-    <label>URLs do site (1 por linha)</label>
-    <textarea name="site_urls">{{ (settings.site_urls or [])|join('\n') }}</textarea>
+    <div class="group">
+      <h3>Lista de URLs</h3>
+      <div id="site_urls_container"></div>
+      <button type="button" onclick="addItem('site_urls_container','site_urls','https://')">+ Adicionar URL</button>
+    </div>
+
+    <div class="group">
+      <h3>Prompts de geração do post</h3>
+      <div id="post_prompts_container"></div>
+      <button type="button" onclick="addItem('post_prompts_container','post_prompts','Novo prompt de post')">+ Adicionar prompt post</button>
+    </div>
+
+    <div class="group">
+      <h3>Prompts de geração da imagem</h3>
+      <div id="image_prompts_container"></div>
+      <button type="button" onclick="addItem('image_prompts_container','image_prompts','Novo prompt de imagem')">+ Adicionar prompt imagem</button>
+    </div>
 
     <div class="row">
       <div>
@@ -46,7 +62,7 @@
 
     <div class="row">
       <div>
-        <label>OpenAI API Key (ChatGPT)</label>
+        <label>OpenAI API Key</label>
         <input name="openai_api_key" value="{{ settings.openai_api_key or '' }}" />
       </div>
       <div>
@@ -75,5 +91,36 @@
   <form method="post" action="/run-now">
     <button type="submit">Executar post agora</button>
   </form>
+
+  <script>
+    function addItem(containerId, inputName, value = '') {
+      const container = document.getElementById(containerId);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'item';
+
+      const input = document.createElement('textarea');
+      input.name = inputName;
+      input.value = value;
+      input.rows = 3;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn-danger';
+      removeBtn.textContent = 'Apagar';
+      removeBtn.onclick = () => wrapper.remove();
+
+      wrapper.appendChild(input);
+      wrapper.appendChild(removeBtn);
+      container.appendChild(wrapper);
+    }
+
+    const initialSiteUrls = {{ (settings.site_urls or []) | tojson }};
+    const initialPostPrompts = {{ (settings.post_prompts or []) | tojson }};
+    const initialImagePrompts = {{ (settings.image_prompts or []) | tojson }};
+
+    (initialSiteUrls.length ? initialSiteUrls : ['']).forEach(v => addItem('site_urls_container', 'site_urls', v));
+    (initialPostPrompts.length ? initialPostPrompts : ['']).forEach(v => addItem('post_prompts_container', 'post_prompts', v));
+    (initialImagePrompts.length ? initialImagePrompts : ['']).forEach(v => addItem('image_prompts_container', 'image_prompts', v));
+  </script>
 </body>
 </html>

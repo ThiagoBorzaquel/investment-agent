@@ -1,23 +1,24 @@
-from flask import Flask, redirect, render_template, request, url_for, flash
+from flask import Flask, flash, redirect, render_template, request, url_for
 
-from social_automation import (
-    ContentAutomationBot,
-    build_bot_config,
-    load_runtime_settings,
-    save_runtime_settings,
-)
+from social_automation import ContentAutomationBot, build_bot_config, load_runtime_settings, save_runtime_settings
 
 app = Flask(__name__)
 app.secret_key = "admin-dashboard-secret"
 
 
+def _clean_list(values):
+    return [v.strip() for v in values if v and v.strip()]
+
+
 def _form_to_settings(form):
     return {
-        "site_urls": [u.strip() for u in form.get("site_urls", "").splitlines() if u.strip()],
+        "site_urls": _clean_list(form.getlist("site_urls")),
+        "post_prompts": _clean_list(form.getlist("post_prompts")),
+        "image_prompts": _clean_list(form.getlist("image_prompts")),
         "instagram_user_id": form.get("instagram_user_id", "").strip(),
         "instagram_access_token": form.get("instagram_access_token", "").strip(),
         "instagram_image_url": form.get("instagram_image_url", "").strip(),
-        "schedule_times": [t.strip() for t in form.get("schedule_times", "09:00").split(",") if t.strip()],
+        "schedule_times": _clean_list(form.get("schedule_times", "09:00").split(",")),
         "timezone": form.get("timezone", "America/Sao_Paulo").strip(),
         "openai_api_key": form.get("openai_api_key", "").strip(),
         "openai_text_model": form.get("openai_text_model", "gpt-4.1-mini").strip(),
@@ -41,8 +42,7 @@ def index():
 def run_now():
     try:
         settings = load_runtime_settings()
-        config = build_bot_config(settings)
-        bot = ContentAutomationBot(config)
+        bot = ContentAutomationBot(build_bot_config(settings))
         bot.run_once()
         flash("Post executado com sucesso.", "success")
     except Exception as exc:
