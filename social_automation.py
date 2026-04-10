@@ -5,6 +5,7 @@ import os
 import random
 import re
 import textwrap
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
@@ -135,19 +136,54 @@ class ContentAutomationBot:
         except KeyError:
             return f"{template}\nTicker: {ticker}"
 
+    def _request_openai_with_retry(
+        self,
+        url: str,
+        payload: Dict[str, Any],
+        timeout: int,
+        max_attempts: int = 5,
+    ) -> requests.Response:
+        headers = {
+            "Authorization": f"Bearer {self.config.openai_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        for attempt in range(1, max_attempts + 1):
+            response = requests.post(url, headers=headers, json=payload, timeout=timeout)
+            if response.status_code != 429:
+                response.raise_for_status()
+                return response
+
+            if attempt == max_attempts:
+                response.raise_for_status()
+
+            retry_after = response.headers.get("retry-after")
+            if retry_after and retry_after.isdigit():
+                wait_seconds = int(retry_after)
+            else:
+                wait_seconds = min(2 ** attempt, 30)
+
+            time.sleep(wait_seconds)
+
+        raise RuntimeError("Erro inesperado ao chamar OpenAI.")
+
     def _generate_caption(self, post_prompt: str, tickers: List[str]) -> str:
         if self.config.openai_api_key:
-            return self._generate_caption_with_openai(post_prompt)[:2200]
+            try:
+                return self._generate_caption_with_openai(post_prompt)[:2200]
+            except requests.HTTPError as exc:
+                if exc.response is None or exc.response.status_code != 429:
+                    raise
+            except requests.RequestException:
+                pass
         return f"📈 Radar de hoje\n\nDestaques: {', '.join(tickers) if tickers else 'ticker não identificado'}.\nNão é recomendação de investimento."[:2200]
 
     def _generate_caption_with_openai(self, post_prompt: str) -> str:
-        response = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers={"Authorization": f"Bearer {self.config.openai_api_key}", "Content-Type": "application/json"},
-            json={"model": self.config.openai_text_model, "input": post_prompt},
+        response = self._request_openai_with_retry(
+            url="https://api.openai.com/v1/responses",
+            payload={"model": self.config.openai_text_model, "input": post_prompt},
             timeout=60,
         )
-        response.raise_for_status()
         output = response.json().get("output_text", "").strip()
         if not output:
             raise RuntimeError("Resposta inválida ao gerar legenda.")
@@ -155,7 +191,13 @@ class ContentAutomationBot:
 
     def _generate_image(self, image_prompt: str, fallback_caption: str) -> Path:
         if self.config.openai_api_key:
-            return self._generate_image_with_openai(image_prompt)
+            try:
+                return self._generate_image_with_openai(image_prompt)
+            except requests.HTTPError as exc:
+                if exc.response is None or exc.response.status_code != 429:
+                    raise
+            except requests.RequestException:
+                pass
         image = Image.new("RGB", (1080, 1080), color=(20, 24, 36))
         draw = ImageDraw.Draw(image)
         try:
@@ -171,13 +213,11 @@ class ContentAutomationBot:
         return output
 
     def _generate_image_with_openai(self, image_prompt: str) -> Path:
-        response = requests.post(
-            "https://api.openai.com/v1/images/generations",
-            headers={"Authorization": f"Bearer {self.config.openai_api_key}", "Content-Type": "application/json"},
-            json={"model": self.config.openai_image_model, "prompt": image_prompt, "size": "1024x1024", "response_format": "b64_json"},
+        response = self._request_openai_with_retry(
+            url="https://api.openai.com/v1/images/generations",
+            payload={"model": self.config.openai_image_model, "prompt": image_prompt, "size": "1024x1024", "response_format": "b64_json"},
             timeout=90,
         )
-        response.raise_for_status()
         b64_data = response.json().get("data", [{}])[0].get("b64_json")
         if not b64_data:
             raise RuntimeError("Falha ao gerar imagem com OpenAI.")
