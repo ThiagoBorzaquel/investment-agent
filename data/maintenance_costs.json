@@ -1,0 +1,18 @@
+{
+  "ev": {
+    "pneus": 700,
+    "freios": 450,
+    "alinhamento": 200,
+    "outros": 450,
+    "total_anual_estimado": 1800
+  },
+  "ice": {
+    "oleo": 550,
+    "filtros": 350,
+    "correia": 300,
+    "cambio": 650,
+    "escapamento": 400,
+    "outros": 1250,
+    "total_anual_estimado": 3500
+  }
+}

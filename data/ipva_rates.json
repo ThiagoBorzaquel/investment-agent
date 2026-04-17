@@ -1,0 +1,9 @@
+{
+  "SP": { "stateName": "São Paulo", "ipva_ice": 0.04, "ipva_ev": 0.03, "incentive": "Sem isenção ampla para EV" },
+  "RJ": { "stateName": "Rio de Janeiro", "ipva_ice": 0.04, "ipva_ev": 0.015, "incentive": "Alíquota reduzida para EV" },
+  "MG": { "stateName": "Minas Gerais", "ipva_ice": 0.04, "ipva_ev": 0.0, "incentive": "Isenção parcial conforme categoria" },
+  "PR": { "stateName": "Paraná", "ipva_ice": 0.035, "ipva_ev": 0.0, "incentive": "Incentivo para eletrificados" },
+  "SC": { "stateName": "Santa Catarina", "ipva_ice": 0.02, "ipva_ev": 0.01, "incentive": "Alíquota reduzida para EV" },
+  "BA": { "stateName": "Bahia", "ipva_ice": 0.025, "ipva_ev": 0.015, "incentive": "Redução para híbridos/EV" },
+  "DF": { "stateName": "Distrito Federal", "ipva_ice": 0.035, "ipva_ev": 0.0, "incentive": "Isenção para veículos elétricos" }
+}

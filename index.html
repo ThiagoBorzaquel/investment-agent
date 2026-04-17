@@ -1,27 +1,180 @@
+<!doctype html>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Simulador completo de TCO para comparar carro elétrico vs combustão com payback, break-even, ROI, CO2 e sensibilidade."
+    />
+    <title>EV vs Combustão | Simulador TCO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              brand: '#22c55e',
+              brandDark: '#16a34a'
+            }
+          }
+        }
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="./assets/css/style.css" />
+  </head>
+  <body class="bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen">
+    <header class="sticky top-0 z-20 backdrop-blur bg-white/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <h1 class="text-lg sm:text-2xl font-bold">⚡ EV vs Combustão — Simulador TCO</h1>
+        <button id="theme-toggle" class="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800">
+          Alternar tema
+        </button>
+      </div>
+    </header>
 
-<html>
-<head>
-    <title>Investment Agent</title>
-</head>
-<body>
-    <h1>Ranking Value - 2026-04-17</h1>
+    <main class="max-w-7xl mx-auto p-4 grid lg:grid-cols-3 gap-4">
+      <section class="lg:col-span-1 card p-4 space-y-4">
+        <h2 class="text-xl font-semibold">Entradas principais</h2>
+        <form id="tco-form" class="grid gap-3">
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="input-group">Preço EV (R$)
+              <input type="number" min="0" step="100" name="evPrice" value="180000" required />
+            </label>
+            <label class="input-group">Preço Combustão (R$)
+              <input type="number" min="0" step="100" name="icePrice" value="145000" required />
+            </label>
+          </div>
 
-    <h2>Top 5</h2>
-    <pre>
-📊 Ranking Value Diário - 2026-04-17
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="input-group">Km por ano
+              <input type="number" min="0" step="100" name="annualKm" value="18000" required />
+            </label>
+            <label class="input-group">Horizonte (anos)
+              <select name="horizonYears">
+                <option value="1">1 ano</option>
+                <option value="5" selected>5 anos</option>
+                <option value="10">10 anos</option>
+              </select>
+            </label>
+          </div>
 
-PETR4 | Score: 45 | PVP: 1.51 | PL: 6.4
-SUZB3 | Score: 43 | PVP: 1.34 | PL: 4.39
-BBAS3 | Score: 40 | PVP: 0.75 | PL: 10.12
-MGLU3 | Score: 40 | PVP: 0.64 | PL: 35.58
-GGBR4 | Score: 40 | PVP: 0.79 | PL: 31.2
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="input-group">Consumo EV (km/kWh)
+              <input type="number" min="0.1" step="0.1" name="evEfficiency" value="6.5" required />
+            </label>
+            <label class="input-group">Consumo combustão (km/L)
+              <input type="number" min="0.1" step="0.1" name="iceEfficiency" value="11" required />
+            </label>
+          </div>
 
-    </pre>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="input-group">Tarifa energia (R$/kWh)
+              <input type="number" min="0" step="0.01" name="energyPrice" value="0.95" required />
+            </label>
+            <label class="input-group">Preço combustível (R$/L)
+              <input type="number" min="0" step="0.01" name="fuelPrice" value="5.99" required />
+            </label>
+          </div>
 
-    <h2>Gráfico</h2>
-    <img src="grafico.png" width="600">
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="input-group">Seguro EV (% preço)
+              <input type="number" min="0" step="0.1" name="evInsurancePct" value="2.5" />
+            </label>
+            <label class="input-group">Seguro combustão (% preço)
+              <input type="number" min="0" step="0.1" name="iceInsurancePct" value="2.2" />
+            </label>
+          </div>
 
-    <h2>Downloads</h2>
-    <a href="ranking_value_2026-04-17.csv">Baixar CSV</a>
-</body>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="input-group">Estado (IPVA)
+              <select name="state" id="state-select"></select>
+            </label>
+            <label class="input-group">Cidade (para tarifa local)
+              <input type="text" name="city" value="São Paulo" />
+            </label>
+          </div>
+
+          <details class="rounded-lg border border-slate-300 dark:border-slate-700 p-3">
+            <summary class="cursor-pointer font-semibold">Inputs avançados</summary>
+            <div class="mt-3 space-y-3">
+              <label class="input-group">Manutenção anual EV (R$)
+                <input type="number" min="0" step="50" name="evMaintenanceAnnual" value="1800" />
+              </label>
+              <label class="input-group">Manutenção anual combustão (R$)
+                <input type="number" min="0" step="50" name="iceMaintenanceAnnual" value="3500" />
+              </label>
+              <label class="input-group">Probabilidade troca bateria no período (%)
+                <input type="number" min="0" max="100" step="1" name="batteryReplacementProbability" value="15" />
+              </label>
+              <label class="input-group">Custo troca bateria (R$)
+                <input type="number" min="0" step="500" name="batteryReplacementCost" value="45000" />
+              </label>
+            </div>
+          </details>
+
+          <details class="rounded-lg border border-slate-300 dark:border-slate-700 p-3">
+            <summary class="cursor-pointer font-semibold">Simulador de sensibilidade</summary>
+            <div class="mt-3 space-y-3">
+              <label class="input-group">Aumento combustível: <span id="fuel-adjust-label">0%</span>
+                <input type="range" min="-30" max="50" value="0" name="fuelIncreasePct" id="fuel-adjust" />
+              </label>
+              <label class="input-group">Aumento energia: <span id="energy-adjust-label">0%</span>
+                <input type="range" min="-30" max="50" value="0" name="energyIncreasePct" id="energy-adjust" />
+              </label>
+              <label class="input-group">Variação km anual: <span id="km-adjust-label">0%</span>
+                <input type="range" min="-50" max="80" value="0" name="kmVariationPct" id="km-adjust" />
+              </label>
+            </div>
+          </details>
+
+          <button type="submit" class="bg-brand hover:bg-brandDark text-white font-semibold py-2 rounded-lg">Calcular TCO</button>
+        </form>
+      </section>
+
+      <section class="lg:col-span-2 space-y-4">
+        <article class="card p-4">
+          <div id="results-grid" class="grid sm:grid-cols-2 xl:grid-cols-4 gap-3"></div>
+        </article>
+
+        <article class="card p-4">
+          <h2 class="text-lg font-semibold mb-2">Comparativo detalhado</h2>
+          <div id="comparison-table"></div>
+        </article>
+
+        <article class="card p-4">
+          <h2 class="text-lg font-semibold mb-2">Gráficos</h2>
+          <div class="grid md:grid-cols-2 gap-4">
+            <canvas id="costEvolutionChart" height="220"></canvas>
+            <canvas id="costBreakdownChart" height="220"></canvas>
+          </div>
+        </article>
+
+        <article class="card p-4">
+          <h2 class="text-lg font-semibold mb-2">Busca opcional FIPE</h2>
+          <div class="grid md:grid-cols-3 gap-3">
+            <label class="input-group">Tipo
+              <select id="fipeType">
+                <option value="carros">Carros</option>
+                <option value="motos">Motos</option>
+                <option value="caminhoes">Caminhões</option>
+              </select>
+            </label>
+            <label class="input-group">Marca
+              <select id="fipeBrand"></select>
+            </label>
+            <label class="input-group">Modelo
+              <select id="fipeModel"></select>
+            </label>
+          </div>
+          <button id="fetch-fipe" class="mt-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700">Buscar valor FIPE</button>
+          <p id="fipe-output" class="mt-2 text-sm text-slate-700 dark:text-slate-300"></p>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./assets/js/app.js"></script>
+  </body>
 </html>
