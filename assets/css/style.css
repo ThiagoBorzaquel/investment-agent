@@ -1,0 +1,58 @@
+:root {
+  color-scheme: dark light;
+}
+
+.card {
+  border: 1px solid rgb(203 213 225 / 0.6);
+  border-radius: 0.9rem;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 0.08);
+}
+
+.dark .card {
+  border-color: rgb(51 65 85 / 0.8);
+  background: rgb(15 23 42 / 0.85);
+  box-shadow: 0 10px 28px rgb(2 6 23 / 0.5);
+}
+
+.input-group {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.input-group input,
+.input-group select {
+  border-radius: 0.6rem;
+  border: 1px solid rgb(148 163 184);
+  padding: 0.55rem 0.65rem;
+  background: white;
+  color: rgb(15 23 42);
+}
+
+.dark .input-group input,
+.dark .input-group select {
+  background: rgb(30 41 59);
+  border-color: rgb(71 85 105);
+  color: rgb(226 232 240);
+}
+
+.metric-card {
+  border-radius: 0.75rem;
+  border: 1px solid rgb(148 163 184 / 0.6);
+  padding: 0.8rem;
+}
+
+.metric-title {
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+}
+
+.dark .metric-title {
+  color: rgb(148 163 184);
+}
+
+.metric-value {
+  font-weight: 700;
+  font-size: 1.1rem;
+}

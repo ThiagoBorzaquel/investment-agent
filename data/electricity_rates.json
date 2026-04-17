@@ -1,0 +1,10 @@
+[
+  { "uf": "SP", "city": "São Paulo", "provider": "Enel SP", "rate": 0.95 },
+  { "uf": "SP", "city": "Campinas", "provider": "CPFL", "rate": 0.92 },
+  { "uf": "RJ", "city": "Rio de Janeiro", "provider": "Light", "rate": 1.01 },
+  { "uf": "MG", "city": "Belo Horizonte", "provider": "Cemig", "rate": 0.89 },
+  { "uf": "PR", "city": "Curitiba", "provider": "Copel", "rate": 0.84 },
+  { "uf": "SC", "city": "Florianópolis", "provider": "Celesc", "rate": 0.86 },
+  { "uf": "BA", "city": "Salvador", "provider": "Neoenergia Coelba", "rate": 0.91 },
+  { "uf": "DF", "city": "Brasília", "provider": "Neoenergia Brasília", "rate": 0.87 }
+]
