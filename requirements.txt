@@ -3,3 +3,8 @@ pandas
 numpy
 requests
 matplotlib
+apscheduler
+beautifulsoup4
+pillow
+flask
+pyotp
